@@ -4,10 +4,12 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <pwd.h>
 #include <climits>
 #include <cstring>
 #include <cerrno>
+#include <csignal>
 
 #include <vector>
 #include <string>
@@ -200,7 +202,7 @@ public:
       intro_line += "> ";
     }
 
-    os << MAGENTA << intro_line << RESET;
+    os << BOLDCYAN << intro_line << RESET;
     return SUCCESS;
   }
 
@@ -251,7 +253,7 @@ public:
 
     if (!output_file_name.empty())
     {
-      fd_out = open(output_file_name.c_str(), O_RDONLY);
+      fd_out = open(output_file_name.c_str(), O_WRONLY | O_TRUNC | O_CREAT, S_IWRITE | S_IREAD);
       if (fd_out == -1)
       {
         print_err(std::cerr, ERR_FILE_OPEN);
@@ -262,7 +264,7 @@ public:
 
     if (!input_file_name.empty())
     {
-      fd_in = open(output_file_name.c_str(), O_WRONLY);
+      fd_in = open(input_file_name.c_str(), O_RDONLY);
       if (fd_in == -1)
       {
         print_err(std::cerr, ERR_FILE_OPEN);
@@ -294,6 +296,7 @@ public:
     curr_dir = get_curr_dir();
     if (errno != 0)
     {
+      kill(getpid(), SIGINT);
       ADD_LOG_WITH_RETURN(FAILURE, 3);
     }
 
@@ -325,6 +328,7 @@ public:
     v.push_back(nullptr);
     execvp(v[0], &v[0]);
     perror(v[0]);      // TODO: error message and new intro_line print sequence is not determined
+    kill(getpid(), SIGKILL);
   }
   /**********************************************************************/
 

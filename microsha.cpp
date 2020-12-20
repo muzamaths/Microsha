@@ -20,25 +20,20 @@ ERR_CODE Microsha::Run()
     signal_value = 0;
     command::print_intro_line(std::cout);
 
-    try {
-      //TODO: something is wrong here. Signal : sighup is thrown. But if 'break' is removed lool becomes infinite
-      if (!getline(std::cin, command_line))
-      {
-        throw std::string("EOF");
-        break;
-      }
-
-      if (signal_value == SIGINT) {
-        continue;
-      }
-
-      pipeline.reset_pipeline(command_line);
-      pipeline.exec();
-    }
-    catch (std::string &msg) {
-      std::cerr << msg << std::endl;
+    //TODO: something is wrong here. Signal : sighup is thrown. But if 'break' is removed lool becomes infinite
+    if (!getline(std::cin, command_line))
+    {
+      std::cout << std::endl;
       break;
     }
+
+    if (signal_value == SIGINT) {
+      continue;
+    }
+
+    pipeline.reset_pipeline(command_line);
+    pipeline.exec();
+
   }
 
   return SUCCESS;

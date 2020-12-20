@@ -157,11 +157,13 @@ public:
 
           close(pipe_array[i - 1][WRITE_END]);
           close(pipe_array[i][READ_END]);
+          command_queue[i].exec();
         }
         else // if (i == (command_queue.size() - 1))
         {
           dup2(pipe_array[i - 1][READ_END], STDIN_FILENO);
-          close(pipe_array[i - 1][WRITE_END]);
+          close(pipe_array[i - 1][WRITE_END]);\
+          command_queue[i].exec();
         }
       }
       else // if (pid != 0) - parent
