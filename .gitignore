@@ -3,3 +3,4 @@ test
 .idea
 CMakeLists.txt
 a.out
+log_out.txt

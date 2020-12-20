@@ -46,6 +46,7 @@ public:
     // check if number of external i\o ( </> ) points fits the pattern in the description of class
     if (check_cmd_line_IO_pattern(command_line, splitted_cmd_line) != SUCCESS)
     {
+      print_err(std::cerr, ERR_WRONG_INPUT);
       ADD_LOG_WITH_RETURN(ERR_WRONG_INPUT, 2);
     }
 
