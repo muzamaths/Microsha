@@ -51,11 +51,13 @@
 /***
  * Checks if return value of function is 'SUCCESS'. If not, than this value is used as return value of function
  */
-#define IS_SUCCESS_WITH_RETURN(ret_val)       \
-        ERR_CODE errName = ret_val;           \
-        if (errName != SUCCESS)               \
-        {                                     \
-          ADD_LOG_WITH_RETURN(errName, 0);    \
+#define IS_SUCCESS_WITH_RETURN(ret_val)         \
+        {                                       \
+          ERR_CODE errName = ret_val;           \
+          if (errName != SUCCESS)               \
+          {                                     \
+            ADD_LOG_WITH_RETURN(errName, 0);    \
+          }                                     \
         }
 
 /***

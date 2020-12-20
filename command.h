@@ -2,6 +2,7 @@
 #define MICROSHA_COMMAND_H
 
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/types.h>
 #include <pwd.h>
 #include <climits>
@@ -13,6 +14,7 @@
 #include <algorithm>
 
 #include "string_funcitons.h"
+#include "text_colors.h"
 
 /* Enumeration for internal commands */
 enum command_type
@@ -33,7 +35,7 @@ private:
   std::string input_file_name,
     output_file_name;
   std::vector<std::string> command_name;
-  command_type cmd_type;
+  command_type cmd_type = CMD_OUT;
 
 public:
   /* Default class constructor */
@@ -73,7 +75,7 @@ public:
 
     // count number of i/o points TODO: ask isn't it excessive
     auto input_point_num  = std::count(command_parts.begin(), command_parts.end(), "<"),
-      output_point_num = std::count(command_parts.begin(), command_parts.end(), ">");
+         output_point_num = std::count(command_parts.begin(), command_parts.end(), ">");
 
     if (input_point_num > 1 || output_point_num > 1)
     {
@@ -82,7 +84,7 @@ public:
 
     // initialize command name and i/o file names
     auto input_point  = std::find(command_parts.begin(), command_parts.end(), "<"),
-      output_point = std::find(command_parts.begin(), command_parts.end(), ">");
+         output_point = std::find(command_parts.begin(), command_parts.end(), ">");
 
     if (output_point < input_point)
     {
@@ -90,7 +92,7 @@ public:
       output_file_name = *(output_point + 1);
       if (input_point != command_parts.end()) // TODO: add format check : "cat <" or "< lol.txt" are not detected without error now
       {
-        input_file_name = *(input_point + 1);
+        input_file_name = *(input_point + 1); // invalid pointer can be tried to go by
       }
     }
     else if (input_point < output_point)
@@ -113,7 +115,7 @@ public:
   }
 
   /* Returns 'command_type' value by string */
-  command_type get_command_type(const std::string &cmd_name)
+  static command_type get_command_type(const std::string &cmd_name)
   {
     if      (cmd_name == "cd"  ) { return CMD_CD;   }
     else if (cmd_name == "pwd" ) { return CMD_PWD;  }
@@ -198,7 +200,7 @@ public:
       intro_line += "> ";
     }
 
-    os << intro_line;
+    os << MAGENTA << intro_line << RESET;
     return SUCCESS;
   }
 
@@ -209,7 +211,7 @@ public:
     {
       case CMD_CD: {
         if (command_name.size() == 1) { IS_SUCCESS_WITH_RETURN(exec_cd(get_home_dir()))}
-        else if (command_name.size() == 2) { IS_SUCCESS_WITH_RETURN(exec_cd(command_name[0]))}
+        else if (command_name.size() == 2) { IS_SUCCESS_WITH_RETURN(exec_cd(command_name[1]))}
         else { return FAILURE; }
         break;
       }
@@ -226,10 +228,47 @@ public:
 
       case CMD_OUT:
       {
-        // TODO: obtain redirection of i/o (i.e. cat > a)
+        IS_SUCCESS_WITH_RETURN(io_redirect())
         exec_bash_command(command_name);
         break;
       }
+
+      case CMD_TIME:
+      {
+        std::cerr << "Wrong format : 'time' is used in an unappropriate place\n";
+        break;
+      }
+    }
+
+    return SUCCESS;
+  }
+
+  /* Obtains i\o redirection */
+  ERR_CODE io_redirect()
+  {
+    int fd_in = -1,
+        fd_out = -1;
+
+    if (!output_file_name.empty())
+    {
+      fd_out = open(output_file_name.c_str(), O_RDONLY);
+      if (fd_out == -1)
+      {
+        print_err(std::cerr, ERR_FILE_OPEN);
+        ADD_LOG_WITH_RETURN(ERR_FILE_OPEN, 3);
+      }
+      dup2(fd_out, STDOUT_FILENO);
+    }
+
+    if (!input_file_name.empty())
+    {
+      fd_in = open(output_file_name.c_str(), O_WRONLY);
+      if (fd_in == -1)
+      {
+        print_err(std::cerr, ERR_FILE_OPEN);
+        ADD_LOG_WITH_RETURN(ERR_FILE_OPEN, 3);
+      }
+      dup2(fd_in, STDIN_FILENO);
     }
 
     return SUCCESS;
@@ -240,6 +279,7 @@ public:
   {
     if (chdir(new_dir.c_str()) == -1)
     {
+      print_err(std::cerr, ERR_FILE_DIR_EXIST);
       ADD_LOG_WITH_RETURN(ERR_FILE_DIR_EXIST, 0);
     }
 
@@ -272,7 +312,6 @@ public:
     return SUCCESS;
   }
 
-  /* Executes external bash commands or finds out that these commands do not exist */
   static void exec_bash_command(const std::vector<std::string> &command_name)
   {
     errno = 0;
@@ -285,7 +324,7 @@ public:
     }
     v.push_back(nullptr);
     execvp(v[0], &v[0]);
-    perror(v[0]);  // this line is reached only when 'execvp' finished with error
+    perror(v[0]);      // TODO: error message and new intro_line print sequence is not determined
   }
   /**********************************************************************/
 

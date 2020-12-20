@@ -6,7 +6,5 @@ int main()
 
   program.Run();
 
-
-  std::cout << "LOL";
   return 0;
 }

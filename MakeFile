@@ -1,0 +1,3 @@
+all:
+	 g++ main.cpp microsha.h microsha.cpp command_pipeline.h command_pipeline.cpp command.h command.cpp error_functions.h error_functions.cpp string_funcitons.h string_funcitons.cpp matcher.h text_colors.h
+
