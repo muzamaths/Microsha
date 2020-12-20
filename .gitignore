@@ -2,3 +2,4 @@ cmake-build-debug
 test
 .idea
 CMakeLists.txt
+a.out

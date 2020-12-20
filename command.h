@@ -10,12 +10,14 @@
 #include <cstring>
 #include <cerrno>
 #include <csignal>
+#include <dirent.h>
 
 #include <vector>
 #include <string>
 #include <algorithm>
 
 #include "string_funcitons.h"
+#include "matcher.h"
 #include "text_colors.h"
 
 /* Enumeration for internal commands */
@@ -58,9 +60,7 @@ public:
 
     if (error_code == SUCCESS)
     {
-      for (auto &cmd_name_part : command_name) {
-        expand_path_regex(cmd_name_part); // TODO : add failure check
-      }
+      error_code = expand_command_path_params();
     }
   }
 
@@ -69,6 +69,7 @@ public:
   {
     if (command_base.empty())
     {
+      print_err(std::cerr, ERR_WRONG_INPUT);
       return ERR_WRONG_INPUT;
     }
 
@@ -81,6 +82,7 @@ public:
 
     if (input_point_num > 1 || output_point_num > 1)
     {
+      print_err(std::cerr, ERR_WRONG_INPUT);
       ADD_LOG_WITH_RETURN(ERR_WRONG_INPUT, 0);
     }
 
@@ -111,7 +113,10 @@ public:
       command_name = command_parts;
     }
 
-    cmd_type = get_command_type(command_parts[0]);
+    if (!command_parts.empty())
+    {
+      cmd_type = get_command_type(command_parts[0]);
+    }
 
     return SUCCESS;
   }
@@ -119,7 +124,8 @@ public:
   /* Returns 'command_type' value by string */
   static command_type get_command_type(const std::string &cmd_name)
   {
-    if      (cmd_name == "cd"  ) { return CMD_CD;   }
+    if      (cmd_name.empty()  ) { return CMD_OUT;  }
+    else if (cmd_name == "cd"  ) { return CMD_CD;   }
     else if (cmd_name == "pwd" ) { return CMD_PWD;  }
     else if (cmd_name == "time") { return CMD_TIME; }
     else if (cmd_name == "set" ) { return CMD_SET;  }
@@ -133,24 +139,114 @@ public:
   /* Checks if given text contains regex meta-symbols to be expanded */
   static bool is_expansion_needed(const std::string &text)
   {
-    if (text.find('*') == std::string::npos || text.find('?') == std::string::npos)
+    if (text.find('*') != std::string::npos || text.find('?') != std::string::npos)
     {
       return true;
     }
     return false;
   }
 
-  /* Expands filesystem path regex */
-  static ERR_CODE expand_path_regex (std::string &text)
+  /* Expands all path-regex parameters of command */
+  ERR_CODE expand_command_path_params ()
   {
-    if (!is_expansion_needed(text))
+    for (int i = 0; i < command_name.size(); i++)
     {
-      return SUCCESS;
-    }
-    // TODO : ...
+      if (!is_expansion_needed(command_name[i])) { continue; }
 
+      std::vector<std::string> expanded_path_names = expand_path_regex(command_name[i]);
+
+      if (expanded_path_names.empty()) { continue; }
+
+      command_name.erase(command_name.begin() + i);
+      command_name.insert(command_name.begin() + i, expanded_path_names.begin(), expanded_path_names.end());
+    }
+    
     return SUCCESS;
   }
+  
+  /* Expands filesystem path regex */
+  static std::vector<std::string> expand_path_regex(const std::string &path_regex)
+  {
+    std::vector<std::string> splitted_path_regex;
+    split_string_by_token(path_regex, '/', splitted_path_regex);
+
+    std::vector<std::string> expanded_path_name;
+    std::string path;
+    bool flag = false;
+
+    if (splitted_path_regex[0].empty())
+    {
+      path = "/";
+      flag = true;
+    }
+    else
+    {
+      path = get_curr_dir() + "/";
+    }
+    expanded_path_name.emplace_back("");
+
+    bool is_dir = false;
+    if (splitted_path_regex[splitted_path_regex.size() - 1].empty())
+    {
+      is_dir = true;
+    }
+
+    std::vector<std::string> reverse_names;
+    for (auto it = splitted_path_regex.rbegin(); it != splitted_path_regex.rend(); it++) 
+    {
+      if (it->empty()) { continue; }
+      reverse_names.push_back(*it);
+    }
+    
+    int args_ptr = reverse_names.size() - 1;
+    while (args_ptr >= 0)
+    {
+      std::vector<std::string> tmp_path_name;
+      for (std::string& i : expanded_path_name)
+      {
+        if (flag)
+        {
+          i += '/';
+        }
+        DIR* dir = opendir((path + i).c_str());
+        if (dir != nullptr)
+        {
+          for (dirent* d = readdir(dir); d != nullptr; d = readdir(dir))
+          {
+            if (d->d_name[0] == '.') { continue; }
+            if (args_ptr > 0)
+            {
+              Matcher m(d->d_name, reverse_names[args_ptr].c_str());
+              if (d->d_type == DT_DIR && m.match())
+              {
+                tmp_path_name.push_back(i + d->d_name);
+              }
+            }
+            else
+            {
+              Matcher m(d->d_name, reverse_names[args_ptr].c_str());
+              if ((d->d_type == DT_DIR || (d->d_type == DT_REG && !is_dir)) && m.match())
+              {
+                tmp_path_name.push_back(i + d->d_name);
+              }
+            }
+          }
+        }
+        closedir(dir);
+      }
+      expanded_path_name = tmp_path_name;
+      args_ptr--;
+      flag = true;
+    }
+
+    if (expanded_path_name.empty())
+    {
+      return {};
+    }
+
+    return expanded_path_name;
+  }
+
   /**********************************************************************/
 
   /**********************************************************************
@@ -237,7 +333,7 @@ public:
 
       case CMD_TIME:
       {
-        std::cerr << "Wrong format : 'time' is used in an unappropriate place\n";
+        print_err(std::cerr, ERR_WRONG_INPUT);
         break;
       }
     }
@@ -330,6 +426,7 @@ public:
     perror(v[0]);      // TODO: error message and new intro_line print sequence is not determined
     kill(getpid(), SIGKILL);
   }
+
   /**********************************************************************/
 
 

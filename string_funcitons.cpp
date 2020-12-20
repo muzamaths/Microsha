@@ -10,6 +10,10 @@ void split_string_by_token(const std::string &text, char token, std::vector<std:
       if (i == prev)
       {
         prev++;
+        if (token == '/' && i == 0)
+        {
+          words.emplace_back("");
+        }
       }
       else
       {
